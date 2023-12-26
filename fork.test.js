@@ -1,4 +1,3 @@
-
 const { ethers, network } = require("hardhat");
 
 
@@ -9,21 +8,26 @@ const ORACLE_ABI = require("./oracle_abi.json");
 
 const WETH_TOKEN_ADDRESS = "0x639A647fbe20b6c8ac19E48E2de44ea792c62c5C";
 const USDC_TOKEN_ADDRESS = "0xE3F5a90F9cb311505cd691a46596599aA1A0AD7D";
+const WBTC_TOKEN_ADDRESS = "0x6aB6d61428fde76768D7b45D8BFeec19c6eF91A8";
 
 const mockAddress = "0x624f1B50966d8884708C3457a21D577D7307f704";
 
-const CONTROL_ADDRESS = "0x0983B43A40A2e36ce1EA55B2aC88041Fc88E2613";
+const CONTROL_ADDRESS = "0xD5B649c7d27C13a2b80425daEe8Cb6023015Dc6B";
+const A_CONTROL_ADDRESS = "";
 
 const USDC_MARKET_ADDRESS = "0x8153303F72aB12f13180c946723BCACAe05A4C4a";
 const WETH_MARKET_ADDRESS = "0xB5Dc005D89D0b4D0bC4a9459C7f77A403e9bFEea";
 const ORACLE_ADDRESS = "0xA7ad08399bce6dd0f7110D88CC6303F9561aCD48";
+const WBTC_MARKET_ADDRESS = "0x7061adf5b2AF1542219de8D94e5C3DdF370a1cd6";
+const APELL_WBTC_M_ADDRESS = "";
+const APELL_WETH_M_ADDRESS = "";
 
 let provider,borrower;
-let COMP,WETH,USDT;
-let USDC_M,WETH_M;
+let COMP,WETH,WBTC;
+let WBTC_M,WETH_M;
 
 describe("Fork", function () {
-    this.timeout(6000000); // 设置超时时间为60秒
+    this.timeout(6000000);
     it("Testing fork data", async function () {
         provider = ethers.provider;
 
@@ -35,43 +39,35 @@ describe("Fork", function () {
         borrower = await ethers.getSigner(mockAddress);
 
 
-        await network.provider.send("hardhat_setBalance", [
-            mockAddress, // 这是你想设置余额的以太坊地址
-            "0x1BC16D674EC80000" // 2 ETH 对应的 wei 数量，以十进制字符串表示
-          ]);
-
-
         WETH = new ethers.Contract(WETH_TOKEN_ADDRESS, ERC20_ABI, borrower);
-        USDC = new ethers.Contract(USDC_TOKEN_ADDRESS, ERC20_ABI,borrower);
+        WBTC = new ethers.Contract(WBTC_TOKEN_ADDRESS, ERC20_ABI,borrower);
         WETH_M = new ethers.Contract(WETH_MARKET_ADDRESS, MARKET_ABI, borrower);
-        USDC_M = new ethers.Contract(USDC_MARKET_ADDRESS, MARKET_ABI,borrower);
+        WBTC_M = new ethers.Contract(WBTC_MARKET_ADDRESS, MARKET_ABI,borrower);
+        A_WETH_M = new ethers.Contract(APELL_WETH_MARKET_ADDRESS, MARKET_ABI, borrower);
+        A_WBTC_M = new ethers.Contract(APELL_WBTC_MARKET_ADDRESS, MARKET_ABI,borrower);
         CONTROL = new ethers.Contract(CONTROL_ADDRESS, CONTROL_ABI,borrower);
-        ORACLE = new ethers.Contract(ORACLE_ADDRESS,ORACLE_ABI,borrower);
+        A_CONTROL = new ethers.Contract(A_CONTROL_ADDRESS, CONTROL_ABI,borrower);
 
 
-        await checkBalance(USDC,mockAddress,"USDC:");
-        await checkBalance(WETH,mockAddress,"WETH");
-        await USDC.connect(borrower).approve(USDC_MARKET_ADDRESS,10000000000000);
-        await checkSupply(USDC_M,"初始供应：");
-        await USDC_M.connect(borrower).mint(10000000000);
-        await checkSupply(USDC_M,"mint供应：");
-        await checkBalance(WETH,WETH_MARKET_ADDRESS,"现有的数量：");       
-        await WETH_M.connect(borrower).borrow("29387094");
+        await A_CONTROL.connect(borrower).enterMarkets([APELL_WBTC_M_ADDRESS,APELL_WETH_M_ADDRESS]);
+        await CONTROL.connect(borrower).enterMarkets([WBTC_M_ADDRESS,WETH_M_ADDRESS]);
+
+        await WETH.connect(borrower).approve(A_WETH_M,10000000000000000000);
+        await A_WETH_M.connect(borrower).mint(ethers.parseUnits("10", 18));
+        await A_BTC_M.connect(borrower).borrow(36341233);
+        checkBalance(WBTC,mockAddress,"解出来的WBTC：");
+
+        await WBTC.connect(borrower).approve(WBTC_MARKET_ADDRESS,10000000000000);
+        await checkSupply(WBTC_M,"初始供应：");
+        await WBTC_M.connect(borrower).mint(36341233);
+        await checkSupply(WBTC_M,"mint供应：");
+        await checkBalance(WETH,WETH_MARKET_ADDRESS,"现有的数量：");
+        await WETH_M.connect(borrower).borrow("29387094995625137706");
         await checkBalance(WETH,mockAddress,"我的钱包现有WETH");
-
-        let a = await CONTROL.getAccountLiquidity(mockAddress);
-        let b = await USDC_M.getAccountSnapshot(mockAddress);
-        console.log(a);
-        console.log(b);
-        await checkBalance(USDC_M,mockAddress,"LP");
-        let c = await CONTROL.getAssetsIn(mockAddress);
-        console.log(c);
-        let d = await ORACLE.getUnderlyingPrice(USDC_MARKET_ADDRESS);
-        console.log(d);
-
 
     });
 });
+
 
 async function doMintToStrike(){
     // 检查初始供应
