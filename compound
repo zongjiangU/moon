@@ -1,0 +1,158 @@
+const { ethers, network } = require("hardhat");
+
+
+const ERC20_ABI = require("./erc20_abi.json");
+const MARKET_ABI = require("./market_abi.json");
+const CONTROL_ABI = require("./cotrol_abi.json");
+const ORACLE_ABI = require("./oracle_abi.json");
+
+const WETH_TOKEN_ADDRESS = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
+const USDC_TOKEN_ADDRESS = "0x8965349fb649A33a30cbFDa057D8eC2C48AbE2A2";
+const WBTC_TOKEN_ADDRESS = "0x6aB6d61428fde76768D7b45D8BFeec19c6eF91A8";
+
+const ORACLE_ADDRESS = "0xe235EE21299B232B13E9A119e553CC5d8A56cD0C";
+
+const A = "0xC5db68F30D21cBe0C9Eac7BE5eA83468d69297e6";
+const mockAddress = "0xD1Ce135893B2f6C4c583733dd5eCf3E67260E7f7";
+const B = "0x1e0C9D09F9995B95Ec4175aaA18b49f49f6165A3";
+let borrower;
+let COMP,WETH,WBTC;
+let WBTC_M,WETH_M;
+
+describe("Fork", function () {
+    this.timeout(6000000);
+    it("Testing fork data", async function () {
+        let provider = ethers.provider;
+
+        await network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: [mockAddress],
+        });
+
+        borrower = await ethers.getSigner(mockAddress);
+
+      //  WBTC = new ethers.Contract(USDC_TOKEN_ADDRESS, ERC20_ABI,borrower);
+      //  let h = await WBTC.balanceOf(mockAddress);
+      //  console.log(h);
+        A_CONTROL = await new ethers.Contract(B, CONTROL_ABI,borrower);
+        let d = await A_CONTROL.getAllMarkets();
+        console.log(d);
+        //let o = await A_CONTROL.getOracle();
+        //console.log(o);
+        O = new ethers.Contract(ORACLE_ADDRESS,ORACLE_ABI,borrower);
+
+        for(let i = 0;i<d.length;i++){
+            try{
+                console.log(d[i]);
+                let temp = new ethers.Contract(d[i], MARKET_ABI,borrower);
+                let pp =await  temp.totalSupply();
+                let rr = await temp.symbol();
+                let un = await A_CONTROL.markets(d[i]);
+                let und = await temp.underlying();
+                console.log(pp,rr,un,und,d[i]);
+                let pr = await O.getUnderlyingPrice(d[i]);
+                console.log("价格：",pr);
+            }catch{
+                console.log("error",d[i]);
+                continue;
+            }
+           
+
+        }
+
+/*        WETH = new ethers.Contract(WETH_TOKEN_ADDRESS, ERC20_ABI, borrower);
+        WBTC = new ethers.Contract(WBTC_TOKEN_ADDRESS, ERC20_ABI,borrower);
+        WETH_M = new ethers.Contract(WETH_MARKET_ADDRESS, MARKET_ABI, borrower);
+        WBTC_M = new ethers.Contract(WBTC_MARKET_ADDRESS, MARKET_ABI,borrower);
+        A_WETH_M = new ethers.Contract(APELL_WETH_MARKET_ADDRESS, MARKET_ABI, borrower);
+        A_WBTC_M = new ethers.Contract(APELL_WBTC_MARKET_ADDRESS, MARKET_ABI,borrower);
+        CONTROL = new ethers.Contract(CONTROL_ADDRESS, CONTROL_ABI,borrower);
+        A_CONTROL = new ethers.Contract(A_CONTROL_ADDRESS, CONTROL_ABI,borrower);
+
+
+        await A_CONTROL.connect(borrower).enterMarkets([APELL_WBTC_M_ADDRESS,APELL_WETH_M_ADDRESS]);
+        await CONTROL.connect(borrower).enterMarkets([WBTC_M_ADDRESS,WETH_M_ADDRESS]);
+
+        await WETH.connect(borrower).approve(A_WETH_M,10000000000000000000);
+        await A_WETH_M.connect(borrower).mint(ethers.parseUnits("10", 18));
+        await A_BTC_M.connect(borrower).borrow(36341233);
+        checkBalance(WBTC,mockAddress,"解出来的WBTC：");
+
+        await WBTC.connect(borrower).approve(WBTC_MARKET_ADDRESS,10000000000000);
+        await checkSupply(WBTC_M,"初始供应：");
+        await WBTC_M.connect(borrower).mint(36341233);
+        await checkSupply(WBTC_M,"mint供应：");
+        await checkBalance(WETH,WETH_MARKET_ADDRESS,"现有的数量：");
+        await WETH_M.connect(borrower).borrow("29387094995625137706");
+        await checkBalance(WETH,mockAddress,"我的钱包现有WETH");*/
+
+    });
+});
+
+function calculateSwapInput(reserveIn, reserveOut, amountOut) {
+    const feeRate = BigInt(997);
+    const feeDenominator = BigInt(1000);
+
+    reserveIn = BigInt(reserveIn);
+    reserveOut = BigInt(reserveOut);
+    amountOut = BigInt(amountOut);
+
+    let numerator = reserveIn * amountOut * feeDenominator;
+    let denominator = (reserveOut - amountOut) * feeRate;
+    let amountIn = numerator / denominator + BigInt(1); // 向上取整
+
+    return amountIn;
+}
+
+
+
+async function doMintToStrike(){
+    // 检查初始供应
+    await checkSupply(STRIKE_COMP_MARKET, "开始时的供应");
+
+    // 执行交易
+    await COMP.connect(borrower).approve(STRIKE_COMP_MARKET_ADDRESS, ethers.parseUnits("100", 18));
+    await STRIKE_COMP_MARKET.connect(borrower).mint(ethers.parseUnits("100", 18));
+
+    // 检查最新供应
+    await checkSupply(STRIKE_COMP_MARKET, "当前LP的供应");
+    await STRIKE_COMP_MARKET.connect(borrower).redeem("4999999999999999999998");
+    await checkSupply(STRIKE_COMP_MARKET, "redeem后LP的供应");
+
+    await COMP.connect(borrower).transfer(STRIKE_COMP_MARKET_ADDRESS,"4999999999999999999999");
+    await checkBalance(COMP,STRIKE_COMP_MARKET_ADDRESS,"transfer后market中COMP数量");
+    await checkBalance(COMP,mockAddress,"转入后我的剩余COMP数量");
+
+    let snap = await CONTROL.getAccountLiquidity(mockAddress);
+    console.log("snap: ",snap);
+
+    let snap1 = await STRIKE_COMP_MARKET.getAccountSnapshot(mockAddress);
+    console.log("snap:",snap1);
+
+    let s = await USDT.balanceOf("0x69702cfd7DAd8bCcAA24D6B440159404AAA140F5");
+    console.log("USDT : ",s);
+    let n = await CONTROL.connect(vault).borrowAllowed(STRIKE_USDT_MARKET_ADDRESS,mockAddress,ethers.parseUnits("5000", 6));
+    console.log(n);
+    let m = await STRIKE_USDT_MARKET.connect(borrower).borrow(ethers.parseUnits("5000", 6));
+    console.log("m : ",m);
+    let e = await USDT.balanceOf(mockAddress);
+    console.log("USDT : ",e);
+
+}
+
+async function redeemUnderlyingToStrike(){
+    await checkBalance(STRIKE_COMP_MARKET,mockAddress,"redeemUnserlying前我的LP");
+    await STRIKE_COMP_MARKET.connect(borrower).redeemUnderlying("4999999999999999999998");
+    await checkBalance(STRIKE_COMP_MARKET,mockAddress,"redeemUnserlying后我的LP");
+    await checkBalance(COMP,STRIKE_COMP_MARKET_ADDRESS,"redeemUnserlying后剩余COMP数量");
+}
+
+
+async function checkSupply(tokenContract, msg) {
+    let totalSupply = await tokenContract.totalSupply();
+    console.log(msg, totalSupply.toString());
+}
+async function checkBalance(tokenContract, user, msg) {
+    let balance = await tokenContract.balanceOf(user);
+    console.log(msg, balance.toString());
+}
