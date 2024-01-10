@@ -1,0 +1,128 @@
+const { ethers, network } = require("hardhat");
+
+
+const ERC20_ABI = require("./erc20_abi.json");
+const VLP_ABI = require("./vlp.json");
+const VALUE_ABI= require("./value.json");
+const UNISWAP_ABI = require("./swap_abi.json")
+const c_abi = require("./cotrol_abi.json");
+const m_abi=require("./market_abi.json");
+const oracle_abi = require("./oracle_abi.json");
+const adp = require("./adp.json");
+const curve = require("./curve.json");
+const lending = require("./lending.json");
+
+
+const WETH_TOKEN_ADDRESS = "0x4200000000000000000000000000000000000006";
+const VALUE_TOKEN_ADDRESS = "0x49E833337ECe7aFE375e44F4E3e8481029218E5c";
+const mockAddress = "0xdF3e18d64BC6A983f673Ab319CCaE4f1a57C7097";
+
+const YFV_address = "0x45f24BaEef268BB6d63AEe5129015d69702BCDfa";
+
+const UNISWAP_V_ADDRESS = "0x775dCc0121e0a67801B849236207dB3af0a97B0d";
+const VLP_1_ADDRESS = "0xbd63d492bbb13d081D680CE1f2957a287FD8c57c";
+const VLP_2_ADDRESS = "0xB8098e1Cb8645dA67238e340558eC1c8625B10dB";
+const VLP_3_ADDRESS = "0xBD14c6Bb5a5Cd7dc63BA224517B492983ABF75D7";
+
+const BP_ADDRESS = "0x89bB17aF665Ec0607268C697Bb294117992027Cf";
+
+const C_ADDRESS = "0x3632E78219227b172F0aaF56F92FB08D87C94379";
+
+const WSTETH_TOKEN_ADDRESS = "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb";
+const POOL_ADDRESS = "0xB90B9B1F91a01Ea22A182CD84C1E22222e39B415";
+
+const mockETHAddress = "0x86bb63148d17d445ed5398ef26aa05bf76dd5b59";
+const USDC_ADDRESS = "0x7F5c764cBc14f9669B88837ca1490cCa17c31607";
+const weth_address = "0x4200000000000000000000000000000000000006";
+const wsteth_address = "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb";
+
+const my_address = "0xdbc43ba45381e02825b14322cddd15ec4b3164e6";
+https://github.com/DefiLlama/DefiLlama-Adapters/blob/main/projects/midas-capital/index.js
+
+let borrower;
+describe("Fork", function () {
+    this.timeout(0);
+    it("Testing fork data", async function () {
+        
+
+        await network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: [mockAddress],
+        });
+        await network.provider.request({
+            method: "hardhat_impersonateAccount",
+            params: [mockETHAddress],
+        });
+        // 设置账户余额
+        await network.provider.send("hardhat_setBalance", [
+            mockAddress,
+            "0xDE0B6B3A7640000",
+        ]);
+        // 设置账户余额
+        await network.provider.send("hardhat_setBalance", [
+            mockETHAddress,
+            "0xDE0B6B3A7640000",
+        ]);
+        let provider = ethers.provider;
+
+        borrower = await provider.getSigner(mockAddress);    
+        ver = await provider.getSigner(mockETHAddress);
+
+      /*  let MY = new ethers.Contract("0xdbc43ba45381e02825b14322cddd15ec4b3164e6",ERC20_ABI,borrower);
+        await MY.connect(borrower).doAttack();*/
+
+        YFV = new ethers.Contract(YFV_address,ERC20_ABI,borrower);
+        UNISWAP_V = new ethers.Contract(UNISWAP_V_ADDRESS,UNISWAP_ABI,borrower);
+        VLP_1 = new ethers.Contract(VLP_1_ADDRESS,VLP_ABI,borrower);
+        VLP_2 = new ethers.Contract(VLP_2_ADDRESS,VLP_ABI,borrower);
+        VLP_3 = new ethers.Contract(VLP_3_ADDRESS,VLP_ABI,borrower);
+        BP = new ethers.Contract(BP_ADDRESS,m_abi,borrower);
+        C = new ethers.Contract(C_ADDRESS,c_abi,borrower);
+  
+        let all = await C.getAllMarkets();
+        console.log(all);
+        let o = await C.oracle();
+        OC = new ethers.Contract(o,oracle_abi,borrower);
+        console.log(o);
+
+        for(let i =0;i<all.length;i++){
+            try{
+            let t = new ethers.Contract(all[i],m_abi,borrower);
+            let total = await t.totalSupply();
+            console.log("------------------total---------------------------------",total);
+            let sy = await t.symbol();
+            console.log(sy,all[i]);
+            let p = await C.mintGuardianPaused(all[i]);
+            console.log("mint pause",p);
+            let m = await C.markets(all[i]);
+            console.log("markets",m);
+            let ex = await t.exchangeRateStored();
+            let de = await t.decimals();
+            let pr = await OC.getUnderlyingPrice(all[i]);
+            console.log("price---",pr);
+            console.log("---------------------ex-------",ex,de);
+            }catch{
+                console.log("-------er-----------------",all[i]);
+            }
+        }
+
+    });
+});
+
+async function getAmountOut(amountIn, reserveIn, reserveOut) {
+    let amountInWithFee = amountIn * 994n;
+    let numerator = amountInWithFee * reserveOut;
+    let denominator = reserveIn * 1000n + amountInWithFee;
+    let amountOut = numerator / denominator;
+
+    return amountOut;
+}
+
+async function checkSupply(tokenContract, msg) {
+    let totalSupply = await tokenContract.totalSupply();
+    console.log(msg, totalSupply.toString());
+}
+async function checkBalance(tokenContract, user, msg) {
+    let balance = await tokenContract.balanceOf(user);
+    console.log(msg, balance.toString());
+}
