@@ -1,13 +1,10 @@
-/** @type import('hardhat/config').HardhatUserConfig */
-require("@nomicfoundation/hardhat-ethers");
+require("@nomicfoundation/hardhat-toolbox");
 module.exports = {
-  solidity: "0.8.4",
-
+  solidity: "0.8.27",
   networks: {
     hardhat: {
       forking: {
-        url: "https://rpc.api.moonriver.moonbeam.network",
-		blockNumber:5810800
+        url: "https://eth-mainnet.g.alchemy.com/v2/PwTuHRI1g3e3py3my0x46MeA5-_U2s90",
       }
     }
   }
