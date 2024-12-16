@@ -1,0 +1,158 @@
+/**
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Copyright (c) 2023, Circle Internet Financial, LLC.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+pragma solidity 0.8.27;
+import "hardhat/console.sol";
+
+interface CTOKEN{
+    function liquidateBorrow(address borrower, uint repayAmount, address cTokenCollateral) external returns (uint);
+    //function liquidateBorrow(address borrower, address cTokenCollateral) external payable;
+    function borrowBalanceStored(address account) external returns (uint);
+    function redeem(uint redeemTokens) external returns (uint); 
+    function accrueInterest() external returns (uint);
+    function mint(uint mintAmount) external returns (uint);
+    function borrow(uint borrowAmount) external returns (uint);
+     function borrowRatePerBlock() external view returns (uint);
+    function redeemUnderlying(uint redeemAmount) external returns (uint);
+}
+
+interface CT{
+    function getAllMarkets() external view returns (address[] memory);
+    function getAccountLiquidity(address account) external view returns (uint, uint, uint);
+    function borrowGuardianPaused(address cToken) external returns (bool);
+    function enterMarkets(address[] memory cTokens) external returns (uint[] memory);
+}
+
+interface GM{
+    function mint(address[] memory markets) external;
+    function claimRewards(uint256 tokenId) external; 
+    function lockLiquidity(uint256 tokenId, address market) external;
+    function pendingReward(address rewardToken, uint256 tokenId) external view returns (uint256);
+    function distributeReward(address market) external;
+}
+
+interface ERC20{
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address _owner) external view returns (uint256 balance);
+    function withdraw( uint requestedAmount) external;
+    function totalSupply() external view returns (uint256);
+}
+
+interface POOL{
+    function earnedOf(address account) external view returns (uint256);
+    function stake(uint256 amount) external;
+}
+
+contract OO{
+    address OM = 0x3593D125a4f7849a1B059E64F4517A86Dd60c95d;
+    address controller = 0x2F9fa63066cfA2d727F57ddf1991557bA86F12c9;
+    address public owner;
+    address USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address cUSDC = 0x6365B24999105aFd1Bc44Ddd43718B2407E43298;
+    address gm = 0x82018eeb2EB992b98d12CaDA73E55a30E00c84d5;
+    address gNFT = 0x2e86fA4440d93b1BFfEa5cA673314ef54216D0a8;
+    address rw = 0x0529CEa607586B33148B77c165f88362c9B00B11;
+    address pTON = 0x6256aB9480B84Cf70d75773121C0523F87B0D588;
+    address cpTON = 0xd307d71B53964Bd3E2E2E9429c04b7C7f8A55002;
+
+
+    address TARGET = 0x0e8D670D40F8784c7EBb1F1A67902A6086f5f87C;
+
+    constructor(){
+        owner = msg.sender;
+    }
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Ownable: caller is not the owner");
+        _;
+    }
+
+    function mint() public{
+        uint tokenId = ERC20(gNFT).totalSupply();
+        address[] memory cTokens = new address[](1);
+        cTokens[0] = cUSDC;
+        CT(controller).enterMarkets(cTokens);
+        ERC20(USDC).transferFrom(msg.sender, address(this), 1000*1e6);
+        ERC20(USDC).approve(cUSDC, 1000*1e6);
+        uint a = CTOKEN(cUSDC).mint(1000*1e6);
+        GM(gm).mint(cTokens);
+        GM(gm).lockLiquidity(tokenId, cUSDC);
+        GM(rw).distributeReward(cpTON);
+        console.log(GM(rw).pendingReward(pTON, tokenId));
+        GM(rw).claimRewards(tokenId);
+        console.log("end",ERC20(pTON).balanceOf(address(this)),ERC20(pTON).balanceOf(rw));
+    }
+
+    function doit() public{
+        //ERC20(USDC).transferFrom(msg.sender, address(this), 10*1e6);
+        //ERC20(USDC).approve(cUSDC, 10*1e6);
+        //CTOKEN(cUSDC).liquidateBorrow(0xf60FD90FC72E1eb4D2054a24F5DCf7658f166EdA, 10*1e6, cinch);
+        //CTOKEN(cinch).redeemUnderlying(ERC20(inch).balanceOf(cinch));
+        //CTOKEN(0x185Ab80A77D362447415a5B347D7CD86ecaCC87C).accrueInterest();
+        uint a = 0;
+        uint b = 0;
+        uint c = 0;
+        (a,b,c) = CT(controller).getAccountLiquidity(0x2dDdb6a69f071313580073941a4491313303b1AB);
+        console.log(a,b,c);
+        //console.log("end",CTOKEN(cinch).borrowBalanceStored(0x54AF3CbB3691DABaa29b54C70a0c27fAc992E4eb));
+               
+    }
+
+
+    function fuck() public{
+        address[] memory a = CT(controller).getAllMarkets();
+        for(uint i = 0;i<a.length;i++){
+            //if(CT(controller).borrowGuardianPaused(a[i]) == false){
+            //    console.log(a[i]);
+            //}
+            console.log(a[i]);
+        }
+        console.log("end");
+    }
+
+    function query() public{
+        address[] memory a = CT(controller).getAllMarkets();
+        for(uint i = 0;i<a.length;i++){
+            uint r = CTOKEN(a[i]).borrowBalanceStored(0x2dDdb6a69f071313580073941a4491313303b1AB);
+            if(r>0){
+                console.log(a[i],r);
+            }
+        }
+        console.log("******");
+    }
+
+    function withdraw(address token)onlyOwner public {
+        ERC20(token).transfer(owner, ERC20(token).balanceOf(address(this)));
+    }
+
+    receive() external payable { 
+
+    }
+
+     function onERC721Received(
+        address,
+        address from,
+        uint256 tokenId,
+        bytes calldata
+    ) external returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
+}
+
