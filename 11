@@ -1,84 +1,113 @@
-// SPDX-License-Identifier: GPL-3.0
-
-pragma solidity >=0.8.0 <0.9.0;
-
-import "hardhat/console.sol";
-
-interface IERC20 {
-  function totalSupply() external view returns (uint256 _supply);
-  function balanceOf(address _owner) external view returns (uint256 _balance);
-  function approve(address _spender, uint256 _value) external returns (bool _success);
-  function transfer(address _to, uint256 _value) external returns (bool _success);
-  function transferFrom(address from, address to, uint value) external returns (bool);
-  function decimals()external view returns(uint256 _decimals);
-    function withdraw(uint wad) external;
-}
-interface ILendingPool{
-    function flashLoanSimple(
-        address receiverAddress,
-        address asset,
-        uint256 amount,
-        bytes calldata params,
-        uint16 referralCode
-    ) external;
-}
-
-interface IAir{
-    function openPosition(uint256 _leverage) external payable;
-    function closePosition(uint256 _positionID) external;
-}
-
-interface ICurve{
-    function exchange(int128 i, int128 j, uint256 dx, uint256 min_dy) external;
-}
+const { ethers } = require("hardhat");
+const ERC20_ABI = require("./ERC20.json");
+const DEMO_ABI = require("./ALK.json")
 
 
-contract Sed {
-    address owner;
-    address AAVE = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
-    address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address UNIETH = 0xF1376bceF0f78459C0Ed0ba5ddce976F1ddF51F4;
-    address AIR = 0x291B812D84707EEB256D618C4c333Ff5F451321F;
-    address CURVE = 0x0f2F4D68308dB60d36268a602EF273421A227021;
-    ICurve curve;
-    IAir air;
-    ILendingPool aave;
+const USDC_ADDR = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+const WBTC = "0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599";
+const mockAddress = "0x28C6c06298d514Db089934071355E5743bf21d60";
+const mockAddress2 = "0xf89d7b9c864f589bbF53a82105107622B35EaA40";
+const mockAddress3 = "0x8EB8a3b98659Cce290402893d0123abb75E3ab28";
+const mockAddress4 = "0xF977814e90dA44bFA03b6295A0616a897441aceC";
+const mockAddress5 = "0x36cc7B13029B5DEe4034745FB4F24034f3F2ffc6";
+const WETH_A = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
+const KNC_A = "0xdd974D5C2e2928deA5F71b9825b8b646686BD200";
+const ZH_A = "0x837010619aeb2AE24141605aFC8f66577f6fb2e7";
+const rHC_A = "0x47C0aD2aE6c0Ed4bcf7bc5b380D7205E89436e84";
+const WBTC_A = "0xEB4C2781e4ebA804CE9a9803C67d0893436bB27D";
+const BA_A = "0x3472A5A71965499acd81997a54BBA8D852C6E53d";
+const BAO_A = "0x374CB8C27130E2c9E04F44303f3c8351B9De61C1";
+const MAT_A = "0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0";
+const DAI_A = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
+const CON_A = "0xf9c70750bF615dE83fE7FF62D30C7faACD8f8Ba0";
+const DN_A = "0x364C828eE171616a39897688A831c2499aD972ec";
+const cDN_A = "0xE2B76Da8899f861d10103eaDBEa95685e2450697";
+
+const cUSDC_A = "0x5F86F598e4Fa983097fe6693a1b51F047d87b9Cf";
+
+const USDE_A = "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3";
+const cUSDE_A = "0x1c6ecFfAd93117FdF0B11fAF0733A796185673f3";
+const cETH_A = "0x70C4F75ebaF99e24d775C91867b1a844da6eF6FD";
+
+describe("Fork", function () {
+  this.timeout(0);
+  it("Testing fork data", async function () {
+
+    console.log((await ethers.provider.getBlockNumber()).toString());
+    const provider = ethers.provider;
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [mockAddress],
+    });
+
+    const provider2 = ethers.provider;
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [mockAddress2],
+    });
+
+    const provider3 = ethers.provider;
+    await network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [mockAddress3],
+    });
+
+
+    const DD = await ethers.getContractFactory("OO");
+    const Demo = await DD.deploy();
     
-    constructor() {
-        owner =  msg.sender;
-        aave = ILendingPool(AAVE);
-        air = IAir(AIR);
-        curve = ICurve(CURVE);
-    }
+    const signer = await ethers.provider.getSigner(mockAddress);
+    const signer2 = await ethers.provider.getSigner(mockAddress2);
+    const signer3 = await ethers.provider.getSigner(mockAddress3);
 
-    modifier onlyOwner(){
-        require(msg.sender == owner);
-        _;
-    }
+    const WETH = new ethers.Contract(WETH_A, ERC20_ABI, provider);
+    const USDC = new ethers.Contract(USDC_ADDR, ERC20_ABI, provider);
+    const cUSDC = new ethers.Contract(cUSDC_A, ERC20_ABI, provider);
+    const cmUSDC = new ethers.Contract(cUSDC_A, DEMO_ABI, provider);
+    const USDE = new ethers.Contract(USDE_A, ERC20_ABI, provider);
+    const cUSDE = new ethers.Contract(cUSDE_A, ERC20_ABI, provider);
+    const cmUSDE = new ethers.Contract(cUSDE_A, DEMO_ABI, provider);
+    const cc = new ethers.Contract(CON_A, DEMO_ABI, provider);
+    const cDN = new ethers.Contract(cDN_A, ERC20_ABI, provider);
+    const cmETH = new ethers.Contract(cETH_A, DEMO_ABI, provider);
 
-    function fuck() public{
-        aave.flashLoanSimple(address(this),WETH,1005*1e18,"0x",0);
-    }
+    await WETH.connect(signer3).transfer(mockAddress, "10000000000000000000");
+    await USDE.connect(signer2).transfer(mockAddress, "100000000000000000000");
+                                                    
+    await USDC.connect(signer).approve(cUSDC_A, "350000000000000000000000000");
+    await USDE.connect(signer).approve(cUSDE_A, "350000000000000000000000000");
+    await WETH.connect(signer).approve(cETH_A,  "350000000000000000000000000");
+    console.log("start1");
+    await cmUSDC.connect(signer).mint("400000000");
+    console.log("start3");
+    await cUSDC.connect(signer).approve(CON_A, "3000000000000000000000000000000");
+    console.log("start4");
+    await cmUSDE.connect(signer).repayBorrowBehalf("0xb31827898981b1a9a4f04b3CdEb25BA8a053eF2d","10403327664541815483");
+    console.log("start5");
+    await cmETH.connect(signer).repayBorrowBehalf("0xb31827898981b1a9a4f04b3CdEb25BA8a053eF2d","4905437709008597");
+    console.log("start6");
+    const borrower = "0xb31827898981b1a9a4f04b3CdEb25BA8a053eF2d";
+    const liquidatables = [
+      {
+        cToken: "0x70C4F75ebaF99e24d775C91867b1a844da6eF6FD",
+        amount: "4905437709008597", 
+        nftIds: [] 
+      }
+    ];
+    // 质押品地址数组
+    const cTokenCollaterals = [
+      "0x1c6ecFfAd93117FdF0B11fAF0733A796185673f3",
+      "0x5F86F598e4Fa983097fe6693a1b51F047d87b9Cf"
+    ];
+    const tx = await cc.connect(signer).batchLiquidateBorrow(
+      borrower,
+      liquidatables,
+      cTokenCollaterals,
+      1
+    );
+    await tx.wait();
+    console.log("end");
+    
+  });
 
-    function open() public payable{
-        air.openPosition{value:msg.value}(1100);
-    }
-
-    function executeOperation(address asset, uint256 amount, uint256 premium,address initiator,bytes calldata params) external returns (bool){
-        //air.closePosition(0);
-        IERC20(WETH).approve(CURVE,type(uint).max);
-        IERC20(UNIETH).approve(CURVE,type(uint).max);
-        IERC20(WETH).approve(AAVE,type(uint).max);
-        console.log("WETH ",IERC20(WETH).balanceOf(address(this)));
-        curve.exchange(1,0,1000*1e18,0);
-        IERC20(WETH).withdraw(46*1e17);
-        air.openPosition{value:46*1e17}(15000);
-        curve.exchange(0,1,IERC20(UNIETH).balanceOf(address(this)),0);
-        console.log("WETH ",IERC20(WETH).balanceOf(address(this)));
-        return true;
-    }
-
-    receive() external payable {
-    }
-
-}
+});
