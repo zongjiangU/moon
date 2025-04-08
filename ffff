@@ -1,0 +1,116 @@
+/**
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Copyright (c) 2023, Circle Internet Financial, LLC.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+pragma solidity 0.8.27;
+import "hardhat/console.sol";
+
+
+struct BatchItem {
+        /// @notice The target contract to be called.
+        address targetContract;
+        /// @notice The account on behalf of which the operation is to be performed. msg.sender must be authorized to
+        /// act on behalf of this account. Must be address(0) if the target contract is the EVC itself.
+        address onBehalfOfAccount;
+        /// @notice The amount of value to be forwarded with the call. If the value is type(uint256).max, the whole
+        /// balance of the EVC contract will be forwarded. Must be 0 if the target contract is the EVC itself.
+        uint256 value;
+        /// @notice The encoded data which is called on the target contract.
+        bytes data;
+}
+interface IE{
+    function call(
+        address targetContract,
+        address onBehalfOfAccount,
+        uint256 value,
+        bytes calldata data
+    ) external payable  returns (bytes memory result);
+    function batch(BatchItem[] calldata items) external payable;
+}
+
+interface IBorrowable {
+    function borrow() external payable;
+}
+
+interface IValut {
+    function borrow(uint256 amount, address receiver) external returns (uint256);
+}
+
+interface IOther{
+    function doit() external;
+}
+
+interface ERC20{
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    function balanceOf(address _owner) external view returns (uint256 balance);
+    function withdraw( uint requestedAmount) external;
+    function totalSupply() external view returns (uint256);
+}
+
+contract Other{
+
+    address public owner;
+    address public target = 0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383;
+    address public valut = 0xD8b27CF359b7D15710a5BE299AF6e7Bf904984C2;
+    address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+
+    constructor(){
+        owner = msg.sender;
+    }
+
+    function doit() external{
+        /*bytes memory data = abi.encodeWithSignature(
+            "borrow(uint256,address)", 
+            100*1e18, 
+            address(this)
+        );
+        IE(target).call(address(this), address(this), 0, data);
+        console.log("WETH: ",ERC20(WETH).balanceOf(address(this)));*/
+        IE(target).call(address(this), address(this), 0, abi.encodeWithSelector(IBorrowable.borrow.selector));
+        console.log("borrow OK");
+    }
+}
+
+contract Eluer{
+    address public owner;
+    address public target = 0x0C9a3dd6b8F28529d72d7f9cE918D493519EE383;
+    address public valut = 0xD8b27CF359b7D15710a5BE299AF6e7Bf904984C2;
+
+    constructor(){
+        owner = msg.sender;
+    }
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Ownable: caller is not the owner");
+        _;
+    }
+
+    function fuck() public{
+        IE(target).call(address(this), address(this), 0, abi.encodeWithSelector(IBorrowable.borrow.selector));
+    }
+
+    function borrow() external payable{
+        console.log("borrow OK");
+        Other o = new Other();
+        o.doit();
+    }
+
+    receive() external payable { 
+
+    }
+}
