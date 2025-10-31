@@ -10,6 +10,20 @@ const CM_CONTRACT_ADDRESS = "0x79C6C1ce5B12abCC3E407ce8C160eE1160250921"; // Cre
 const CREDIT_ACCOUNT_ADDRESS = "0x81AF467CDf226E32945F974A44d209a47f433002"; // isLiquidatable 的第一个参数
 const MIN_HEALTH_FACTOR = 10000; // isLiquidatable 的第二个参数
 
+// 清算相关地址
+const CREDIT_FACADE_ADDRESS = "0x9515AB9BB73A9642F1a93Ba7C2790e9d08227f9a"; // CreditFacadeV3 合约地址
+const ADAPTER_ADDRESS = "0x48034cdD70658c23c67009494691413afe2a4D52"; // Adapter 地址
+
+// CreditFacadeV3 ABI (简化版，只包含需要的函数)
+const CREDIT_FACADE_ABI = [
+  "function liquidateCreditAccount(address creditAccount, address to, tuple(address target, bytes callData)[] calldata calls) external"
+];
+
+// CreditManagerV3 ABI (用于获取 adapter 映射)
+const CREDIT_MANAGER_ABI = [
+  "function adapterToContract(address adapter) external view returns (address)"
+];
+
 describe("从合约地址转账代币到指定地址", function () {
   this.timeout(120000);
 
@@ -187,7 +201,11 @@ describe("从合约地址转账代币到指定地址", function () {
       console.log(`实际接收地址余额: ${recipientBalanceAfter.toString()}`);
     }
 
-    // 13. 编译并部署 SFWbtcs 合约
+    // 13. 部署清算合约并执行清算操作
+    console.log("\n=== 部署清算合约并执行清算操作 ===");
+    await deployAndLiquidate(contractSigner);
+
+    // 14. 编译并部署 SFWbtcs 合约
     console.log("\n=== 编译并部署 SFWbtcs 合约 ===");
     try {
       const DD = await ethers.getContractFactory("SFWbtcs");
@@ -205,4 +223,276 @@ describe("从合约地址转账代币到指定地址", function () {
     }
   });
 });
+
+/**
+ * 部署 LiquidationHelper 合约并执行清算
+ * @param {ethers.Signer} signer - 用于发送交易的 signer
+ */
+async function deployAndLiquidate(signer) {
+  try {
+    console.log("步骤 13.1: 部署 LiquidationHelper 合约...");
+    
+    // 部署清算合约
+    const LiquidationHelperFactory = await ethers.getContractFactory("LiquidationHelper");
+    const liquidationHelper = await LiquidationHelperFactory.deploy(
+      CREDIT_FACADE_ADDRESS,
+      CM_CONTRACT_ADDRESS,
+      ADAPTER_ADDRESS
+    );
+    
+    await liquidationHelper.waitForDeployment();
+    const liquidationHelperAddress = await liquidationHelper.getAddress();
+    console.log(`✓ LiquidationHelper 合约已部署`);
+    console.log(`  合约地址: ${liquidationHelperAddress}\n`);
+    
+    // 验证 adapter 映射
+    console.log("步骤 13.2: 验证 adapter 映射...");
+    try {
+      const actualTarget = await liquidationHelper.getAdapterTarget();
+      console.log(`  Adapter 对应的实际合约地址: ${actualTarget}`);
+      if (actualTarget === "0x0000000000000000000000000000000000000000") {
+        console.log(`  ⚠️  警告: Adapter 未在 CreditManager 中注册或地址不正确\n`);
+      } else {
+        console.log(`  ✓ Adapter 映射验证成功\n`);
+      }
+    } catch (error) {
+      console.log(`  ⚠️  无法获取 adapter 映射: ${error.message}\n`);
+    }
+    
+    // 检查账户是否可清算
+    console.log("步骤 13.3: 检查账户是否可清算...");
+    const cmContract = new ethers.Contract(
+      CM_CONTRACT_ADDRESS,
+      CM_ABI,
+      ethers.provider
+    );
+    try {
+      const isLiquidatable = await cmContract.isLiquidatable(
+        CREDIT_ACCOUNT_ADDRESS,
+        MIN_HEALTH_FACTOR
+      );
+      console.log(`  账户可清算状态: ${isLiquidatable}`);
+      if (!isLiquidatable) {
+        console.log(`  ⚠️  账户当前不可清算，但继续尝试调用...\n`);
+      } else {
+        console.log(`  ✓ 账户可清算\n`);
+      }
+    } catch (error) {
+      console.log(`  ⚠️  无法检查清算状态: ${error.message}\n`);
+    }
+    
+    // 执行清算
+    console.log("步骤 13.4: 调用清算合约的 liquidate 方法...");
+    console.log(`  Credit Account: ${CREDIT_ACCOUNT_ADDRESS}`);
+    console.log(`  To: ${signer.address}`);
+    console.log(`  Adapter: ${ADAPTER_ADDRESS}`);
+    console.log(`  函数: exchange_diff(0,1,1,0)\n`);
+    
+    try {
+      const tx = await liquidationHelper.connect(signer).liquidate(
+        CREDIT_ACCOUNT_ADDRESS,
+        signer.address
+      );
+      
+      console.log(`  ✓ 交易已发送，交易哈希: ${tx.hash}`);
+      console.log("  正在等待交易确认...");
+      
+      const receipt = await tx.wait();
+      console.log(`  ✓ 交易已确认，区块号: ${receipt.blockNumber}`);
+      console.log(`  Gas 使用量: ${receipt.gasUsed.toString()}\n`);
+      
+      console.log("✓✓✓ 清算操作完成\n");
+    } catch (error) {
+      // 尝试解析错误信息
+      if (error.data) {
+        const errorSelector = error.data.slice(0, 10);
+        console.error(`  ❌ 交易失败，错误选择器: ${errorSelector}`);
+        console.error(`  错误数据: ${error.data}`);
+        
+        // 常见错误选择器
+        const errorMap = {
+          "0x5d0bd4ab": "UnknownMethodException - 方法不存在或未授权",
+          "0x": "可能是不允许清算或其他验证失败"
+        };
+        
+        if (errorMap[errorSelector]) {
+          console.error(`  错误说明: ${errorMap[errorSelector]}`);
+        } else {
+          console.error(`  未知错误选择器，可能是自定义错误`);
+        }
+        
+        if (errorSelector === "0x5d0bd4ab") {
+          console.error(`  建议:`);
+          console.error(`    1. 检查 adapter 地址是否正确: ${ADAPTER_ADDRESS}`);
+          console.error(`    2. 检查 adapter 是否在 CreditManager 中注册`);
+          console.error(`    3. 检查 exchange_diff 方法是否允许在清算中调用`);
+        }
+      } else {
+        console.error(`  ❌ 清算操作失败: ${error.message}`);
+        if (error.reason) {
+          console.error(`  失败原因: ${error.reason}`);
+        }
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`❌ 部署或执行清算失败: ${error.message}\n`);
+    if (error.data) {
+      console.error(`  错误数据: ${error.data}\n`);
+    }
+    // 不抛出错误，让测试继续执行
+  }
+}
+
+/**
+ * 调用 CreditFacadeV3 的 liquidateCreditAccount 函数（备用方法）
+ * 调用 adapter 的 exchange_diff(0,1,1,0)
+ * @param {ethers.Signer} signer - 用于发送交易的 signer
+ */
+async function liquidateCreditAccount(signer) {
+  try {
+    console.log("步骤 13.1: 准备清算参数...");
+    
+    // 要清算的 credit account 地址
+    const creditAccountToLiquidate = CREDIT_ACCOUNT_ADDRESS;
+    
+    // 接收清算收益的地址
+    const to = signer.address; // 使用 impersonate 后的地址，或者可以设置为其他地址
+    
+    // 准备 adapter 调用的 callData
+    // 调用 exchange_diff(0,1,1,0)
+    // 函数签名为: exchange_diff(uint256,uint256,uint256,uint256)
+    const adapterInterface = new ethers.Interface([
+      "function exchange_diff(uint256,uint256,uint256,uint256)"
+    ]);
+    const fullCallData = adapterInterface.encodeFunctionData(
+      "exchange_diff",
+      [0, 1, 1, 0]
+    );
+    
+    console.log(`  Credit Account: ${creditAccountToLiquidate}`);
+    console.log(`  To: ${to}`);
+    console.log(`  Adapter: ${ADAPTER_ADDRESS}`);
+    console.log(`  函数: exchange_diff(0,1,1,0)`);
+    console.log(`  CallData: ${fullCallData}\n`);
+    
+    // 创建 MultiCall 结构体数组
+    const calls = [
+      {
+        target: ADAPTER_ADDRESS,
+        callData: fullCallData
+      }
+    ];
+    
+    // 获取 CreditManager 合约实例（用于验证 adapter 映射）
+    console.log("步骤 13.2: 验证 adapter 映射...");
+    const creditManagerContract = new ethers.Contract(
+      CM_CONTRACT_ADDRESS,
+      CREDIT_MANAGER_ABI,
+      ethers.provider
+    );
+    try {
+      const actualTarget = await creditManagerContract.adapterToContract(ADAPTER_ADDRESS);
+      console.log(`  Adapter 对应的实际合约地址: ${actualTarget}`);
+      if (actualTarget === "0x0000000000000000000000000000000000000000") {
+        console.log(`  ⚠️  警告: Adapter 未在 CreditManager 中注册或地址不正确`);
+        console.log(`  提示: 可能需要检查 adapter 地址是否正确，或者 adapter 需要通过其他方式调用\n`);
+      } else {
+        console.log(`  ✓ Adapter 映射验证成功\n`);
+      }
+    } catch (error) {
+      console.log(`  ⚠️  无法获取 adapter 映射: ${error.message}\n`);
+    }
+    
+    // 创建 CreditFacadeV3 合约实例
+    console.log("步骤 13.3: 调用 liquidateCreditAccount...");
+    
+    const creditFacadeContract = new ethers.Contract(
+      CREDIT_FACADE_ADDRESS,
+      CREDIT_FACADE_ABI,
+      signer // 使用传入的 signer
+    );
+    
+    // 检查账户是否可清算
+    console.log("步骤 13.3.1: 检查账户是否可清算...");
+    const cmContract = new ethers.Contract(
+      CM_CONTRACT_ADDRESS,
+      CM_ABI,
+      ethers.provider
+    );
+    try {
+      const isLiquidatable = await cmContract.isLiquidatable(
+        creditAccountToLiquidate,
+        MIN_HEALTH_FACTOR
+      );
+      console.log(`  账户可清算状态: ${isLiquidatable}`);
+      if (!isLiquidatable) {
+        console.log(`  ⚠️  账户当前不可清算，但继续尝试调用...\n`);
+      } else {
+        console.log(`  ✓ 账户可清算\n`);
+      }
+    } catch (error) {
+      console.log(`  ⚠️  无法检查清算状态: ${error.message}\n`);
+    }
+    
+    // 调用 liquidateCreditAccount
+    try {
+      console.log("步骤 13.3.2: 发送清算交易...");
+      const tx = await creditFacadeContract.liquidateCreditAccount(
+        creditAccountToLiquidate,
+        to,
+        calls
+      );
+      
+      console.log(`  ✓ 交易已发送，交易哈希: ${tx.hash}`);
+      console.log("  正在等待交易确认...");
+      
+      const receipt = await tx.wait();
+      console.log(`  ✓ 交易已确认，区块号: ${receipt.blockNumber}`);
+      console.log(`  Gas 使用量: ${receipt.gasUsed.toString()}\n`);
+      
+      console.log("✓✓✓ 清算操作完成\n");
+    } catch (error) {
+      // 尝试解析错误信息
+      if (error.data) {
+        const errorSelector = error.data.slice(0, 10);
+        console.error(`  ❌ 交易失败，错误选择器: ${errorSelector}`);
+        console.error(`  错误数据: ${error.data}`);
+        
+        // 常见错误选择器（可以根据实际合约的错误进行匹配）
+        const errorMap = {
+          "0x5d0bd4ab": "UnknownMethodException - 方法不存在或未授权",
+          "0x": "可能是不允许清算或其他验证失败"
+        };
+        
+        if (errorMap[errorSelector]) {
+          console.error(`  错误说明: ${errorMap[errorSelector]}`);
+        } else {
+          console.error(`  未知错误选择器，可能是自定义错误`);
+        }
+        
+        // 如果错误是 UnknownMethodException，说明 adapter 地址可能不正确
+        // 或者 adapter 中的 exchange_diff 方法不在允许的方法列表中
+        if (errorSelector === "0x5d0bd4ab") {
+          console.error(`  建议:`);
+          console.error(`    1. 检查 adapter 地址是否正确: ${ADAPTER_ADDRESS}`);
+          console.error(`    2. 检查 adapter 是否在 CreditManager 中注册`);
+          console.error(`    3. 检查 exchange_diff 方法是否允许在清算中调用`);
+        }
+      } else {
+        console.error(`  ❌ 清算操作失败: ${error.message}`);
+        if (error.reason) {
+          console.error(`  失败原因: ${error.reason}`);
+        }
+      }
+      throw error; // 重新抛出错误以便测试可以看到
+    }
+  } catch (error) {
+    console.error(`❌ 清算操作失败: ${error.message}\n`);
+    if (error.data) {
+      console.error(`  错误数据: ${error.data}\n`);
+    }
+    // 不抛出错误，让测试继续执行
+  }
+}
 
